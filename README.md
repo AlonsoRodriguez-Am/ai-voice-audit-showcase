@@ -4,7 +4,7 @@ A professional-grade, multi-tenant quality assurance automation platform designe
 
 The project demonstrates a production-ready microservice architecture optimized for strict privacy, compliance (HIPAA/GDPR), and complete on-premise data sovereignty.
 
-## 🚀 Key Architectural Features
+## Key Architectural Features
 
 - **Multi-Tenant Isolation**: Complete logical tenant separation at database and API middleware levels.
 - **Local Audio Processing**: Speech-to-Text (STT) utilizing `faster-whisper` (large-v3) with GPU acceleration, eliminating external transcription costs.
@@ -16,7 +16,7 @@ The project demonstrates a production-ready microservice architecture optimized 
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ```mermaid
 graph TD
@@ -42,7 +42,7 @@ graph TD
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 | Layer | Technology |
 | :--- | :--- |
@@ -55,7 +55,7 @@ graph TD
 
 ---
 
-## ⚙️ Setup & Deployment
+## Setup & Deployment
 
 ### Prerequisites
 - Docker & Docker Desktop
@@ -78,7 +78,7 @@ graph TD
 
 ---
 
-## 🔒 Security & Compliance
+## Security & Compliance
 
 This platform was built from the ground up to support highly regulated environments (Legal, Finance, Healthcare):
 * **No Cloud Leakage:** Transcriptions are handled 100% locally.
