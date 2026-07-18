@@ -1,0 +1,155 @@
+services:
+  db:
+    image: postgres:17
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:?DB_NAME is required}
+      POSTGRES_USER: ${DB_USER:?DB_USER is required}
+      POSTGRES_PASSWORD: ${DB_PASS:?DB_PASS is required}
+    ports:
+      - "${HOST_DB_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: aiaudit-vllm
+    restart: unless-stopped
+    runtime: nvidia
+    ports:
+      - "8899:8899"
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
+      - VLLM_WSL2_ENABLE_PIN_MEMORY=1
+    volumes:
+      - ./vllm_cache:/root/.cache/huggingface
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "ACTIVE_MODEL=$$(cat /root/.cache/huggingface/active_model.txt 2>/dev/null || echo '${LOCAL_LLM_MODEL:-hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4}') &&
+      echo 'Starting vLLM with model:' $$ACTIVE_MODEL &&
+      python3 -m vllm.entrypoints.openai.api_server
+      --model $$ACTIVE_MODEL
+      --port 8899
+      --gpu-memory-utilization 0.85
+      --max-model-len 8192"
+
+  app:
+    build: .
+    restart: always
+    runtime: nvidia
+    ports:
+      - "${HOST_APP_PORT:-5001}:5000"
+    environment:
+      - DB_NAME=${DB_NAME:?DB_NAME is required}
+      - DB_USER=${DB_USER:?DB_USER is required}
+      - DB_PASS=${DB_PASS:?DB_PASS is required}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - LOCAL_LLM_API_BASE=${LOCAL_LLM_API_BASE:-http://vllm:8899/v1}
+      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      - HOST_APP_PORT=${HOST_APP_PORT:-5001}
+    depends_on:
+      - db
+      - redis
+      - vllm
+    volumes:
+      - .:/app
+      - uploads_data:/app/uploads
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./vllm_cache:/root/.cache/huggingface
+      - /app/.pytest_cache
+    command: uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload --reload-dir app
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+
+  worker-stt:
+    build: .
+    runtime: nvidia
+    volumes:
+      - .:/app
+      - uploads_data:/app/uploads
+      - whisper_cache:/root/.cache/huggingface
+      - /app/.pytest_cache
+    command: celery -A app.core.celery_app worker -Q stt_queue --loglevel=info --concurrency=3 -E
+    environment:
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - LOCAL_LLM_API_BASE=${LOCAL_LLM_API_BASE:-http://vllm:8899/v1}
+      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+      - vllm
+
+  worker-llm:
+    build: .
+    volumes:
+      - .:/app
+      - uploads_data:/app/uploads
+      - /app/.pytest_cache
+    command: celery -A app.core.celery_app worker -Q llm_queue --loglevel=info --concurrency=3
+    environment:
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - LOCAL_LLM_API_BASE=${LOCAL_LLM_API_BASE:-http://vllm:8899/v1}
+      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+      - vllm
+
+  flower:
+    image: mher/flower
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - FLOWER_PORT=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:5001
+    depends_on:
+      - app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
+  uploads_data:
+  whisper_cache:

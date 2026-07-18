@@ -1,0 +1,2941 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AI Voice Audit API",
+    "description": "\nAI Voice Audit API provides a robust set of endpoints for automating the quality assurance process in call centers using advanced AI models.\n\n## Key Features\n- **Asynchronous Audio Processing**: Upload call recordings for transcription and AI-powered evaluation.\n- **Dynamic LLM Selection**: Configure specific AI models per Line of Business (LOB).\n- **Multi-Tenancy**: Secure data isolation and tenant-specific configurations.\n- **Advanced Analytics**: Real-time dashboards and exportable reports.\n\n## Authentication\nThis API uses **JWT tokens** for secure authentication. \n1. Obtain tokens via the `/api/auth/login` endpoint.\n2. Include the access token in the `Authorization` header for all protected endpoints:\n   `Authorization: Bearer <your_access_token>`\n",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Authenticate User",
+        "description": "Authenticate a user with email and password to obtain JWT tokens.\n\n## Example curl:\n```bash\ncurl -X POST \"http://localhost:5000/api/auth/login\"          -H \"Content-Type: application/json\"          -d '{\"email\": \"admin@acme.com\", \"password\": \"SecurePass456!\"}'\n```",
+        "operationId": "login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Refresh Access Token",
+        "description": "Obtain a new access token using a valid refresh token.\n\n## Example curl:\n```bash\ncurl -X POST \"http://localhost:5000/api/auth/refresh\"          -H \"Content-Type: application/json\"          -d '{\"refresh_token\": \"eyJhbGci...\"}'\n```",
+        "operationId": "refresh_api_auth_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout User",
+        "description": "Invalidate the current access token by adding it to the blacklist.\n\n## Example curl:\n```bash\ncurl -X POST \"http://localhost:5000/api/auth/logout\"          -H \"Authorization: Bearer <access_token>\"\n```",
+        "operationId": "logout_api_auth_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/users/": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "List All Users",
+        "description": "Retrieve a list of all registered users.\n\n**Restriction:** Only users with the `admin` role can access this endpoint.\n\n## Example curl:\n```bash\ncurl -H \"Authorization: Bearer <access_token>\" \"http://localhost:5000/api/users/\"\n```",
+        "operationId": "get_users_api_users__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  },
+                  "type": "array",
+                  "title": "Response Get Users Api Users  Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Insufficient permissions to access this resource"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/lobs/": {
+      "get": {
+        "tags": [
+          "lobs"
+        ],
+        "summary": "List All LOBs",
+        "description": "Retrieve all Lines of Business for the current tenant.\n\n## Example curl:\n```bash\ncurl -H \"Authorization: Bearer <access_token>\" \"http://localhost:5000/api/lobs/\"\n```",
+        "operationId": "get_lobs_api_lobs__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LOBResponse"
+                  },
+                  "type": "array",
+                  "title": "Response Get Lobs Api Lobs  Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Insufficient permissions to access this resource"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "lobs"
+        ],
+        "summary": "Create New LOB",
+        "description": "Create a new Line of Business with specific evaluation criteria and system prompts.\n\n## Example curl:\n```bash\ncurl -X POST \"http://localhost:5000/api/lobs/\"          -H \"Authorization: Bearer <token>\"          -H \"Content-Type: application/json\"          -d '{\"name\": \"Support\", \"system_prompt\": \"Helpful...\", \"criteria_json\": {}}'\n```",
+        "operationId": "create_lob_api_lobs__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LOBCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Lob Api Lobs  Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - Invalid input data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Missing required field: email"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Insufficient permissions to access this resource"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/lobs/active": {
+      "get": {
+        "tags": [
+          "lobs"
+        ],
+        "summary": "List Active LOBs",
+        "description": "Retrieve only the active Lines of Business for the current tenant.",
+        "operationId": "get_active_lobs_api_lobs_active_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LOBResponse"
+                  },
+                  "type": "array",
+                  "title": "Response Get Active Lobs Api Lobs Active Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/lobs/{lob_id}/activate": {
+      "put": {
+        "tags": [
+          "lobs"
+        ],
+        "summary": "Activate LOB",
+        "description": "Set a specific LOB as active, deactivating others if necessary (based on tenant policy).",
+        "operationId": "activate_lob_api_lobs__lob_id__activate_put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lob_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Resource does not exist",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "User not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lobs/{lob_id}": {
+      "put": {
+        "tags": [
+          "lobs"
+        ],
+        "summary": "Update LOB",
+        "description": "Update the name, prompt, or criteria of an existing LOB.",
+        "operationId": "update_lob_api_lobs__lob_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lob_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LOBUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Resource does not exist",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "User not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "lobs"
+        ],
+        "summary": "Delete LOB",
+        "description": "Permanently delete a Line of Business.",
+        "operationId": "delete_lob_api_lobs__lob_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lob_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Resource does not exist",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "User not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lobs/{lob_id}/llm-config": {
+      "get": {
+        "tags": [
+          "lobs"
+        ],
+        "summary": "Get LLM Configuration",
+        "description": "Retrieve the AI provider configuration for a specific LOB.\n\n**Security Note:** The API key is masked (`\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022`) in the response.",
+        "operationId": "get_llm_config_api_lobs__lob_id__llm_config_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lob_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Resource does not exist",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "User not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "lobs"
+        ],
+        "summary": "Save LLM Configuration",
+        "description": "Store the AI provider settings (provider, model, API key) for a LOB.\n\nThe API key is encrypted at rest using AES-256.",
+        "operationId": "save_llm_config_api_lobs__lob_id__llm_config_put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lob_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LLMTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Resource does not exist",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "User not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lobs/{lob_id}/test-llm": {
+      "post": {
+        "tags": [
+          "lobs"
+        ],
+        "summary": "Test LLM Connection",
+        "description": "Validate that the provided (or stored) LLM configuration can successfully \nreach the AI provider and perform a simple handshake/chat.",
+        "operationId": "test_llm_connection_api_lobs__lob_id__test_llm_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lob_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LLMTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Resource does not exist",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "User not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evaluation/save": {
+      "post": {
+        "tags": [
+          "evaluations"
+        ],
+        "summary": "Save Manual Evaluation",
+        "description": "Save the final score and answers for an evaluation after manual review.",
+        "operationId": "save_evaluation_api_evaluation_save_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluationUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Insufficient permissions to access this resource"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Resource does not exist",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "User not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/process-audio": {
+      "post": {
+        "tags": [
+          "evaluations"
+        ],
+        "summary": "Process Audio File",
+        "description": "Upload an audio recording to be transcribed and analyzed asynchronously by AI.\n\nReturns a `task_id` that can be used to poll for status.\n\n## Example curl:\n```bash\ncurl -X POST \"http://localhost:5000/process-audio\"          -H \"Authorization: Bearer <token>\"          -F \"file=@call.wav\"          -F \"lob_id=1\"\n```",
+        "operationId": "process_audio_process_audio_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lob_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_process_audio_process_audio_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - Invalid input data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Missing required field: email"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-status/{task_id}": {
+      "get": {
+        "tags": [
+          "evaluations"
+        ],
+        "summary": "Get Task Status",
+        "description": "Check the status of a background audio processing task.\n\nReturns 'SUCCESS', 'FAILURE', or 'PROGRESS'. \nIf successful, includes the evaluation result.",
+        "operationId": "get_task_status_task_status__task_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Resource does not exist",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "User not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evaluations/{evaluation_id}/assign-lob": {
+      "post": {
+        "tags": [
+          "evaluations"
+        ],
+        "summary": "Assign LOB to Evaluation",
+        "description": "Manually assign or change the Line of Business associated with an evaluation record.",
+        "operationId": "assign_lob_api_evaluations__evaluation_id__assign_lob_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "evaluation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evaluation Id"
+            }
+          },
+          {
+            "name": "lob_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Resource does not exist",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "User not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/process-bulk-audio": {
+      "post": {
+        "tags": [
+          "evaluations"
+        ],
+        "summary": "Process Bulk Audio",
+        "description": "Upload multiple audio files for parallel background processing.\n\n## Example curl:\n```bash\ncurl -X POST \"http://localhost:5000/process-bulk-audio\"          -H \"Authorization: Bearer <token>\"          -F \"files=@call1.wav\"          -F \"files=@call2.wav\"          -F \"lob_id=1\"\n```",
+        "operationId": "process_bulk_audio_process_bulk_audio_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lob_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_process_bulk_audio_process_bulk_audio_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - Invalid input data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Missing required field: email"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/full-report": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Export Full Evaluation Report",
+        "description": "Export a comprehensive report containing all evaluation records and AI analysis details.\n\n## Example curl:\n```bash\ncurl -H \"Authorization: Bearer <token>\" \"http://localhost:5000/api/reports/full-report?format=xlsx\" --output report.xlsx\n```",
+        "operationId": "download_full_report_api_reports_full_report_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start date (YYYY-MM-DD)",
+              "examples": [
+                "2024-01-01"
+              ],
+              "title": "Date From"
+            },
+            "description": "Start date (YYYY-MM-DD)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "End date (YYYY-MM-DD)",
+              "examples": [
+                "2024-01-31"
+              ],
+              "title": "Date To"
+            },
+            "description": "End date (YYYY-MM-DD)"
+          },
+          {
+            "name": "lob_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by LOB ID",
+              "examples": [
+                1
+              ],
+              "title": "Lob Id"
+            },
+            "description": "Filter by LOB ID"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Export format: csv, xlsx, pdf",
+              "default": "csv",
+              "title": "Format"
+            },
+            "description": "Export format: csv, xlsx, pdf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Insufficient permissions to access this resource"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/summary-report": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Export Summary Report",
+        "description": "Export a high-level summary report with aggregated metrics.",
+        "operationId": "download_summary_report_api_reports_summary_report_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start date",
+              "title": "Date From"
+            },
+            "description": "Start date"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "End date",
+              "title": "Date To"
+            },
+            "description": "End date"
+          },
+          {
+            "name": "lob_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by LOB",
+              "title": "Lob Id"
+            },
+            "description": "Filter by LOB"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Export format: csv, xlsx, pdf",
+              "default": "csv",
+              "title": "Format"
+            },
+            "description": "Export format: csv, xlsx, pdf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Insufficient permissions to access this resource"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/detailed-ai-analysis": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Export Detailed AI Report",
+        "description": "Export a CSV report specifically focused on AI reasoning and raw predictions.",
+        "operationId": "download_detailed_ai_report_api_reports_detailed_ai_analysis_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "lob_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/ai-performance": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Export AI Performance Report",
+        "description": "Export a report detailing cases where manual QA corrected AI predictions.",
+        "operationId": "download_ai_performance_report_api_reports_ai_performance_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "lob_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/pii-audit": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Export PII Audit Report",
+        "description": "Export a report of all PII redaction activities for compliance auditing.",
+        "operationId": "download_pii_audit_report_api_reports_pii_audit_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/metrics": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Dashboard Metrics",
+        "description": "Fetch high-level performance metrics including average score, total calls, \nand compliance percentages.\n\n## Example curl:\n```bash\ncurl -H \"Authorization: Bearer <token>\" \"http://localhost:5000/api/dashboard/metrics?range=week\"\n```",
+        "operationId": "get_dashboard_metrics_api_dashboard_metrics_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Predefined date range: all, today, week, month",
+              "default": "all",
+              "title": "Range"
+            },
+            "description": "Predefined date range: all, today, week, month"
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO date string (YYYY-MM-DD)",
+              "title": "Date From"
+            },
+            "description": "ISO date string (YYYY-MM-DD)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO date string (YYYY-MM-DD)",
+              "title": "Date To"
+            },
+            "description": "ISO date string (YYYY-MM-DD)"
+          },
+          {
+            "name": "lob_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by LOB ID",
+              "title": "Lob Id"
+            },
+            "description": "Filter by LOB ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Insufficient permissions to access this resource"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/trends": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Score Trends",
+        "description": "Get average score trends over time, grouped by the specified period.",
+        "operationId": "get_trends_api_dashboard_trends_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Aggregation period: week or month",
+              "default": "week",
+              "title": "Period"
+            },
+            "description": "Aggregation period: week or month"
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "lob_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/ctq-distribution": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get CTQ Distribution",
+        "description": "Get the pass/fail distribution for Critical to Quality (CTQ) criteria.",
+        "operationId": "get_ctq_distribution_api_dashboard_ctq_distribution_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "lob_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/topic-trends": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Topic Frequency Trends",
+        "description": "Get topic frequency trends over time, allowing identification of common call drivers.",
+        "operationId": "get_topic_trends_api_dashboard_topic_trends_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Aggregation period: week or month",
+              "default": "week",
+              "title": "Period"
+            },
+            "description": "Aggregation period: week or month"
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "lob_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lob Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenants/{tenant_id}/pii-config": {
+      "get": {
+        "tags": [
+          "tenants"
+        ],
+        "summary": "Get PII Configuration",
+        "description": "Retrieve the PII redaction settings for a specific tenant.\n\n**Restriction:** Users can only access their own tenant's configuration unless they are `super_admin`.",
+        "operationId": "get_tenant_pii_config_api_tenants__tenant_id__pii_config_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tenant Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantPIIConfig"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Insufficient permissions to access this resource"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Resource does not exist",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "User not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "tenants"
+        ],
+        "summary": "Update PII Configuration",
+        "description": "Update the PII redaction settings (rules, thresholds) for a tenant.",
+        "operationId": "update_tenant_pii_config_api_tenants__tenant_id__pii_config_put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tenant Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantPIIConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantPIIConfig"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Insufficient permissions to access this resource"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenants/{tenant_id}/pii-config/test": {
+      "post": {
+        "tags": [
+          "tenants"
+        ],
+        "summary": "Test PII Redaction",
+        "description": "Validate PII redaction rules by providing sample text. \nReturns redacted text and a log of detected entities.\n\n## Example curl:\n```bash\ncurl -X POST \"http://localhost:5000/api/tenants/1/pii-config/test\"          -H \"Authorization: Bearer <token>\"          -H \"Content-Type: application/json\"          -d '{\"text\": \"My email is user@example.com\"}'\n```",
+        "operationId": "test_pii_redaction_api_tenants__tenant_id__pii_config_test_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tenant Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "Test Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required or invalid token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Could not validate credentials"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Read Root",
+        "operationId": "read_root_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{full_path}": {
+      "get": {
+        "summary": "Serve Frontend",
+        "operationId": "serve_frontend__full_path__get",
+        "parameters": [
+          {
+            "name": "full_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Full Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_process_audio_process_audio_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File",
+            "description": "The audio file to process (wav/mp3)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_process_audio_process_audio_post"
+      },
+      "Body_process_bulk_audio_process_bulk_audio_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "List of audio files (max 10)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "Body_process_bulk_audio_process_bulk_audio_post"
+      },
+      "EvaluationUpdate": {
+        "properties": {
+          "evaluation_id": {
+            "type": "integer",
+            "title": "Evaluation Id",
+            "description": "ID of the evaluation to update"
+          },
+          "final_score": {
+            "type": "integer",
+            "title": "Final Score",
+            "description": "The manual score assigned by the QA analyst (0-100)",
+            "examples": [
+              85
+            ]
+          },
+          "ttch": {
+            "type": "integer",
+            "title": "Ttch",
+            "description": "Total Time to Complete Handling (seconds)",
+            "examples": [
+              300
+            ]
+          },
+          "final_answers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Final Answers",
+            "description": "The finalized answers for each evaluation criterion",
+            "examples": [
+              {
+                "greeting": "yes",
+                "hipaa_verification": "no"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluation_id",
+          "final_score",
+          "ttch",
+          "final_answers"
+        ],
+        "title": "EvaluationUpdate"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LLMTestRequest": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "description": "Provider name",
+            "examples": [
+              "ollama"
+            ]
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "Model name",
+            "examples": [
+              "llama3.1:8b"
+            ]
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key",
+            "description": "API Key for testing"
+          },
+          "api_base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Base",
+            "description": "Custom API base URL"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "model"
+        ],
+        "title": "LLMTestRequest",
+        "description": "Schema for testing an LLM connection."
+      },
+      "LOBCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the Line of Business",
+            "examples": [
+              "Customer Support",
+              "Sales"
+            ]
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id",
+            "description": "The tenant ID this LOB belongs to",
+            "examples": [
+              1
+            ]
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt",
+            "description": "The system prompt for AI evaluation",
+            "examples": [
+              "You are a helpful assistant..."
+            ]
+          },
+          "criteria_json": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Criteria Json",
+            "description": "JSON object containing evaluation criteria",
+            "examples": [
+              {
+                "greeting": {
+                  "points": 10,
+                  "question": "Did the agent greet?"
+                }
+              }
+            ]
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "description": "Whether this LOB is currently active",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "system_prompt",
+          "criteria_json"
+        ],
+        "title": "LOBCreate"
+      },
+      "LOBResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the Line of Business",
+            "examples": [
+              "Customer Support",
+              "Sales"
+            ]
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id",
+            "description": "The tenant ID this LOB belongs to",
+            "examples": [
+              1
+            ]
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt",
+            "description": "The system prompt for AI evaluation",
+            "examples": [
+              "You are a helpful assistant..."
+            ]
+          },
+          "criteria_json": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Criteria Json",
+            "description": "JSON object containing evaluation criteria",
+            "examples": [
+              {
+                "greeting": {
+                  "points": 10,
+                  "question": "Did the agent greet?"
+                }
+              }
+            ]
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "description": "Whether this LOB is currently active",
+            "default": false
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Unique LOB identifier",
+            "examples": [
+              1
+            ]
+          },
+          "is_builtin": {
+            "type": "boolean",
+            "title": "Is Builtin",
+            "description": "Whether this is a system-provided LOB"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "system_prompt",
+          "criteria_json",
+          "id",
+          "is_builtin",
+          "created_at"
+        ],
+        "title": "LOBResponse",
+        "example": {
+          "created_at": "2024-01-01T12:00:00",
+          "criteria_json": {
+            "greeting": {
+              "mandatory": true,
+              "points": 5,
+              "question": "Did the agent say hello?"
+            }
+          },
+          "id": 1,
+          "is_active": true,
+          "is_builtin": false,
+          "name": "General Support",
+          "system_prompt": "Evaluate call center etiquette...",
+          "tenant_id": 1
+        }
+      },
+      "LOBUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "New name for the LOB"
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt",
+            "description": "New system prompt"
+          },
+          "criteria_json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criteria Json",
+            "description": "Updated criteria JSON"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active",
+            "description": "New active status"
+          }
+        },
+        "type": "object",
+        "title": "LOBUpdate"
+      },
+      "RefreshTokenRequest": {
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token",
+            "description": "The refresh token obtained during login",
+            "examples": [
+              "eyJhbGci..."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "title": "RefreshTokenRequest",
+        "example": {
+          "refresh_token": "eyJhbGci..."
+        }
+      },
+      "TenantPIIConfig": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "enabled_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Enabled Types",
+            "default": [
+              "phone",
+              "email",
+              "ssn",
+              "credit_card"
+            ]
+          },
+          "redaction_token": {
+            "type": "string",
+            "title": "Redaction Token",
+            "default": "***REDACTED***"
+          },
+          "log_redactions": {
+            "type": "boolean",
+            "title": "Log Redactions",
+            "default": true
+          },
+          "names_enabled": {
+            "type": "boolean",
+            "title": "Names Enabled",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "TenantPIIConfig"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token",
+            "description": "JWT access token",
+            "examples": [
+              "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            ]
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token",
+            "description": "JWT refresh token used to obtain new access tokens",
+            "examples": [
+              "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            ]
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "description": "The type of token returned",
+            "default": "bearer",
+            "examples": [
+              "bearer"
+            ]
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "refresh_token",
+          "user"
+        ],
+        "title": "TokenResponse",
+        "example": {
+          "access_token": "eyJhbGci...",
+          "refresh_token": "eyJhbGci...",
+          "token_type": "bearer",
+          "user": {
+            "created_at": "2024-01-01T12:00:00",
+            "email": "admin@acme.com",
+            "id": 1,
+            "role": "admin"
+          }
+        }
+      },
+      "UserLogin": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email",
+            "description": "User's registered email",
+            "examples": [
+              "admin@acme.com"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "description": "User's secret password",
+            "examples": [
+              "SecurePass456!"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "UserLogin"
+      },
+      "UserResponse": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email",
+            "description": "The user's email address",
+            "examples": [
+              "user@company.com"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "title": "Role",
+            "description": "The role assigned to the user",
+            "default": "admin",
+            "examples": [
+              "admin",
+              "qa_manager",
+              "analyst"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "The unique identifier for the user",
+            "examples": [
+              1
+            ]
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "The timestamp when the user was created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "id"
+        ],
+        "title": "UserResponse",
+        "example": {
+          "created_at": "2024-01-01T12:00:00",
+          "email": "admin@acme.com",
+          "id": 1,
+          "role": "admin"
+        }
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "OAuth2PasswordBearer": {
+        "type": "oauth2",
+        "flows": {
+          "password": {
+            "scopes": {},
+            "tokenUrl": "api/auth/login"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Operations for user authentication and session management."
+    },
+    {
+      "name": "users",
+      "description": "Operations for user management and profile settings."
+    },
+    {
+      "name": "lobs",
+      "description": "Operations for Lines of Business (LOB) configuration."
+    },
+    {
+      "name": "evaluations",
+      "description": "Operations for audio transcription and AI analysis."
+    },
+    {
+      "name": "reports",
+      "description": "Operations for generating and exporting analysis reports."
+    },
+    {
+      "name": "dashboard",
+      "description": "Operations for fetching high-level metrics and trends."
+    },
+    {
+      "name": "tenants",
+      "description": "Operations for tenant and multi-tenancy configuration."
+    },
+    {
+      "name": "health",
+      "description": "Basic API health and status checks."
+    }
+  ]
+}

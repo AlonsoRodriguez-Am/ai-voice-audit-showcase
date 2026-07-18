@@ -1,0 +1,122 @@
+================================================================================
+PLAN DE IMPLEMENTACIÓN: ADVANCED LOCAL IA SETTINGS (OLLAMA)
+================================================================================
+
+1. INTRODUCCIÓN Y CONTEXTO
+Para maximizar la utilidad de los modelos locales (vía Ollama), los administradores 
+de LOB (Lines of Business) necesitan control granular sobre los hiperparámetros de inferencia. 
+Dado que los modelos difieren en arquitectura y capacidades (ej. Llama-3, Mistral, DeepSeek), 
+dejar estos valores por defecto resulta en evaluaciones inconsistentes o alucinaciones.
+
+Este plan detalla la inyección de parámetros técnicos de Ollama: Temperature, Top_P, Top_K, 
+Repeat Penalty, Num_CTX, Num_Predict (Reasoning) y Seed en toda la pila (DB -> API -> Ollama -> UI).
+
+================================================================================
+2. MODIFICACIONES EN BASE DE DATOS (PostgreSQL / SQLAlchemy)
+================================================================================
+La tabla LOBs usa un campo JSONB para la configuración del LLM. No se requieren migraciones de esquema duras (Alembic), sino actualizar la validación del JSONB.
+
+Estructura deseada dentro de `lob.llm_config`:
+{
+  "provider": "ollama",
+  "model_name": "llama3.1:8b-instruct-q5_K_M",
+  "base_url": "http://ollama-service:11434",
+  "advanced_settings": {
+    "temperature": 0.2,
+    "top_p": 0.9,
+    "top_k": 40,
+    "repeat_penalty": 1.1,
+    "num_ctx": 8192,
+    "seed": 42,
+    "num_predict": 1024
+  }
+}
+
+================================================================================
+3. MODIFICACIONES EN EL BACKEND (FastAPI / Pydantic)
+================================================================================
+A. Pydantic Schemas (app/schemas/lob.py):
+Crear un esquema anidado para validar fuertemente los parámetros al crear/actualizar un LOB.
+
+```python
+from pydantic import BaseModel, Field
+from typing import Optional
+
+class OllamaAdvancedSettings(BaseModel):
+    temperature: float = Field(default=0.1, ge=0.0, le=2.0, description="Creatividad del modelo.")
+    top_p: float = Field(default=0.9, ge=0.0, le=1.0, description="Nucleus sampling.")
+    top_k: int = Field(default=40, ge=0, description="Limitación de tokens probables.")
+    repeat_penalty: float = Field(default=1.1, ge=1.0, le=2.0, description="Penalización por repetición.")
+    num_ctx: int = Field(default=4096, ge=1024, le=128000, description="Ventana de contexto (VRAM impact).")
+    seed: Optional[int] = Field(default=None, description="Semilla determinista para pruebas QA.")
+    num_predict: int = Field(default=1024, ge=1, description="Máximo de tokens a generar (o razonar).")
+
+class LLMConfigSchema(BaseModel):
+    provider: str
+    model_name: str
+    base_url: Optional[str]
+    advanced_settings: Optional[OllamaAdvancedSettings] = None
+```
+
+B. Lógica de Servicio (app/services/llm_service.py):
+Mapear estos valores a la API REST de Ollama o su librería de Python.
+
+```python
+import httpx
+
+async def call_ollama(prompt: str, llm_config: dict):
+    base_url = llm_config.get("base_url", "http://localhost:11434")
+    adv_settings = llm_config.get("advanced_settings", {})
+    
+    # Mapeo directo a los "options" de Ollama
+    options = {
+        "temperature": adv_settings.get("temperature", 0.1), # Bajo para QA (precisión)
+        "top_p": adv_settings.get("top_p", 0.9),
+        "top_k": adv_settings.get("top_k", 40),
+        "repeat_penalty": adv_settings.get("repeat_penalty", 1.1),
+        "num_ctx": adv_settings.get("num_ctx", 8192), # Crucial para audios largos
+        "num_predict": adv_settings.get("num_predict", 1024) 
+    }
+    
+    if adv_settings.get("seed") is not None:
+        options["seed"] = adv_settings.get("seed")
+
+    payload = {
+        "model": llm_config["model_name"],
+        "prompt": prompt,
+        "options": options,
+        "stream": False
+    }
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(f"{base_url}/api/generate", json=payload, timeout=120.0)
+        response.raise_for_status()
+        return response.json().get("response", "")
+```
+
+================================================================================
+4. MODIFICACIONES EN EL FRONTEND (React / Vite)
+================================================================================
+Componente Destino: `src/pages/LOBSettingsPage.tsx` o un subcomponente `LocalLLMSettings.tsx`.
+
+A. UI/UX Propuesta (Estilo Glassmorphism con Lucide Icons):
+- Usar un componente `<Accordion>` o `<Details>` titulado "⚙️ Advanced Inference Settings (Expert Mode)".
+- Ocultar estos parámetros por defecto para no abrumar al usuario común.
+
+B. Controles Específicos:
+1. Slider de Temperatura:
+   - Rango: 0.0 - 1.0 (Para QA se recomienda fuertemente 0.0 a 0.2).
+   - Tooltip (Lucide Info icon): "Valores cercanos a 0 hacen que la evaluación sea más estricta y analítica. Valores altos fomentan creatividad (no recomendado para auditorías)."
+2. Sliders para Top P y Top K:
+   - Controles numéricos con validación.
+3. Selector de Ventana de Contexto (Num_CTX):
+   - Un Dropdown o Slider (2048, 4096, 8192, 16384).
+   - Mensaje de Advertencia (UI Alert): "Aumentar este valor permite analizar llamadas más largas, pero incrementa drásticamente el uso de VRAM de la GPU."
+4. Campo Num_Predict (Reasoning Budget):
+   - Etiquetado como "Max Generation Tokens / Reasoning Budget".
+   - Tooltip: "Limita la longitud del análisis. Crítico si usas modelos con Chain-of-Thought (DeepSeek-R1) para darles espacio para razonar antes de emitir JSON."
+5. Toggle de Determinismo (Seed):
+   - Checkbox "Habilitar Determinismo de Prueba". Si se activa, muestra un input para el número entero de la semilla. Útil para que la misma llamada siempre reciba la misma evaluación.
+
+C. Integración de Estado (React Hook Form + Zod):
+Actualizar el esquema de Zod en el frontend para validar que los sliders no excedan los límites permitidos antes de enviar la carga útil PUT a la API de FastAPI.

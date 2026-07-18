@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+venv/
+env/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Project specific
+Recordings/
+*.csv
+postgres_data/
+
+# AI Context Files
+!contexto_para_IA/
+contexto_para_IA/*TOKENS*.md
+contexto_para_IA/*TOKENS*.txt
+
+# Design Mockups (local preview only, not for production)
+mockup/
+
+# Showcase Repository
+showcase_repo/
+scripts/create_showcase.py
